@@ -1,6 +1,6 @@
 """
 OOrtiz
-V: 0.0
+V: 1.0
 
 """
 
@@ -9,10 +9,11 @@ import numpy as np
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
 import matplotlib.pyplot as plt
-
+import os 
 
 class Model(object):
     def __init__(self):
+        clear = os.system('cls')
         #graviational acceleration
         global g
         g = 9.81 #m/s^2
@@ -26,19 +27,25 @@ class Model(object):
         self.rho_wall = 2710 #kg/m3
         #heat capacity of wall (al for now)
         self.C_wall = 897 #J/ kg k
-        
+        self.k_wall = 150 #W/(m k)
+
+
         #length of the tank
         self.L_tank = 0.508 #m (~20in)
         #calculates tank volume
         self.V_tank = np.pi * (self.ro**2 - self.ri**2) * self.L_tank
 
         #percent of tank filled with liquid N2O
-        self.fill_percent = 0 #% 
+        self.fill_percent = 50 #% 
 
         #atmospheric temperature
-        self.T_atm = 28 + 273.15 #K
+        self.T_atm = 28 + 273.15 #K | atmospheric temperature
+        self.P_atm = 101325 #Pa | atmospheric pressure 
 
 
+        #timestep
+        self.delta_t = 0 #s
+        self.dV_vap_dt = 0 
         #Temperature of the Vapor part of wall
         self.T_wall_vap = self.T_atm #K | wall temperature at vapor region
         self.T_wall_liq = self.T_atm #K | wall temperature at liquid region
@@ -49,10 +56,12 @@ class Model(object):
         
         N2O_mass = 15.0 #kg | Total mass of N2O
         fill_percent = 0 #% | percentage initially filled with liquid N2O
-        t_stop = 30 * 60 #s (30min * 60sec) | total process time
+        t_stop = 600 #s () | total process time
+        
+        #eventually will chage m_dot to more accurately model pass flow rate
         self.M_dot = N2O_mass / t_stop #kg/s |mass flow rate
-        self.tspan = np.linspace(0, t_stop, 5000)
-        self.Fill = False
+        
+
         
         init_dim = self.Dim_Calcs((N2O_mass * fill_percent),PropsSI('D','T',self.T_wall_liq,'Q',0,'N2O'))        
         
@@ -66,18 +75,214 @@ class Model(object):
         self.A_vap_out = init_dim[7]
         self.m_wall_liq = init_dim[8]
         self.m_wall_vap = init_dim[9]
- 
+
+        self.V_wall_vap = np.pi * (self.ro**2 - self.ri**2) * self.L_vap
+
         self.m_liq = N2O_mass * fill_percent
         self.rho_liq = PropsSI('D','T',self.T_wall_liq,'Q',0,'N2O')
-        if self.Fill == False:
-            self.M_dot = -self.M_dot #mass flow goes into the tank
-            self.init_dim = self.Dim_Calcs((self.m_liq),PropsSI('D','T',self.T_wall_liq,'Q',0,'N2O'))
         
-        self.z = [0, 0, 0, 0, 0] 
-        self.x = odeint(self.ODE, self.z, self.tspan)
+        #Change Pressure Input 
+        #P = 101325 * (1000/14) #initial Pressure 
+
+        ##Assuming all heat conduction equals 0 at start....
+        self.z = [0, 0, 0, 0, 0, 0,\
+             0, 0, 0, PropsSI('D','T',self.T_atm,'Q',1,'N2O'), self.L_vap, self.V_wall_vap ,\
+             0, 0, 0, 0, 0, 0, self.T_atm, self.T_atm] 
+        #self.x = odeint(self.ODE, self.z, self.tspan)
+        self.t = 0 #s | time counter
+        self.t_step = 0.1 #s |time step
+
+        self.t_plt = []
+        self.plot_0 = []
+        self.plot_1 = []
+        self.plot_2 = []
+        self.plot_3 = []
+        self.plot_4 = []
+        self.plot_5 = []
+        self.plot_6 = []
+        self.plot_7 = []
+        self.plot_8 = []
+        self.plot_9 = []
+        self.plot_10 = []
+        self.plot_11 = []
+        self.plot_12 = []
+        self.plot_13 = []
+        self.plot_14 = []
+        self.plot_15 = []
+        self.plot_16 = []
+        self.plot_17 = []
+        self.plot_18 = []
+        self.plot_19 = []
+        #self.plot_20 = []
+
+        k = 10
+        for i in range(0,k):
+            if i == 0:
+                clear
+                print("__________ | 0%")
+            elif i/k == 0.1:
+                clear
+                print("#_________ | 10%")
+            elif i/k == 0.2:
+                clear
+                print("##________ | 20%")        
+            elif i/k == 0.3:
+                clear
+                print("###_______ | 30%")
+            elif i/k == 0.4:
+                clear
+                print("####______ | 40%") 
+            elif i/k == 0.5:
+                clear
+                print("#####_____ | 50%") 
+            elif i/k == 0.6:
+                clear
+                print("######____ | 60%")
+            elif i/k == 0.7:
+                clear
+                print("#######___ | 70%")        
+            elif i/k == 0.8:
+                clear
+                print("########__ | 80%")
+            elif i/k == 0.9:
+                clear
+                print("#########_ | 90%") 
+            elif i/k >= 0.99999:
+                clear
+                print("########## | 100%") 
+
+
+            ######
+            # FOR TESTING PURPOSES ONLY
+            ######
+            self.t_plt.append(self.t)
+            self.plot_0.append(self.z[0]) #Q_liq_surf
+            self.plot_1.append(self.z[1]) #Q_surf_vap           
+            self.plot_2.append(self.z[2]) #Q_wall_vap_out 
+            self.plot_3.append(self.z[3]) #Q_wall_liq_out
+            self.plot_4.append(self.z[4]) #m_evap
+            self.plot_5.append(self.z[5]) #m_cond
+            self.plot_6.append(self.z[6]) #m_vap
+            self.plot_7.append(self.z[7]) #Q_in_vap
+            self.plot_8.append(self.z[8]) #Q_in_liq
+            self.plot_9.append(self.z[9]) #rho_vap 
+            self.plot_10.append(self.z[10]) #L_vap                        
+            self.plot_11.append(self.z[11]) #V_wall_vap
+            self.plot_12.append(self.z[12]) #Q_wall_vap_in
+            self.plot_13.append(self.z[13]) #Q_wall_liq_in 
+            self.plot_14.append(self.z[14]) #Q_wall_vap_cond
+            self.plot_15.append(self.z[15]) #Q_wall_liq_cond
+            self.plot_16.append(self.z[16]) #m_wall_vap_in 
+            self.plot_17.append(self.z[17]) #m_wall_liq_in
+            self.plot_18.append(self.z[18]) #T_wall_vap
+            self.plot_19.append(self.z[19]) #T_wall_liq
+            #self.plot_20.append(self.z[20]) #                        
+            #self.plot_21.append(self.z[21]) #
+
+
+
+
+
+            info = self.ODE(self.z, self.t_step)
+            #Initial conditions plus rate of change.... 
+            self.z += np.dot(self.t_step, info)
+            self.t += self.t_step        
+
+        self.Visualize()
+
+
+    def Visualize(self): # used to plot the data, toggle graphs on and off...
+        #For Testing Purposes....
+
+
+        plt.ylabel('Q_liq_surf')
+        plt.plot(self.t_plt, self.plot_0) #Q_liq_surf
+        plt.show()
+
+        plt.ylabel('Q_surf_vap')    
+        plt.plot(self.t_plt, self.plot_1, '-', lw=2) #Q_surf_vap           
+        plt.show()
+
+        plt.ylabel('Q_wall_vap_out')
+        plt.plot(self.t_plt, self.plot_2, '-', lw=2) #Q_wall_vap_out 
+        plt.show()
+
+        plt.ylabel('Q_wall_liq_out')
+        plt.plot(self.t_plt, self.plot_3) #Q_wall_liq_out
+        plt.show()
+        
+        plt.ylabel('m_evap')
+        plt.plot(self.t_plt, self.plot_4) #m_evap
+        plt.show()        
+        
+        plt.ylabel('m_cond')
+        plt.plot(self.t_plt, self.plot_5) #m_cond
+        plt.show()
+        
+        plt.ylabel('m_vap')
+        plt.plot(self.t_plt, self.plot_6) #m_vap
+        plt.show()
+
+        plt.ylabel('Q_in_vap')
+        plt.plot(self.t_plt, self.plot_7) #Q_in_vap
+        plt.show()
+
+        plt.ylabel('Q_in_liq')
+        plt.plot(self.t_plt, self.plot_8) #Q_in_liq
+        plt.show()
+        
+        plt.ylabel('rho_vap')
+        plt.plot(self.t_plt, self.plot_9) #rho_vap 
+        plt.show()
+
+        plt.ylabel('L_vap')
+        plt.plot(self.t_plt, self.plot_10) #L_vap                        
+        plt.show()
+        
+        plt.ylabel('V_wall_vap')
+        plt.plot(self.t_plt, self.plot_11) #V_wall_vap
+        plt.show()
+        
+        plt.ylabel('Q_wall_vap_in')
+        plt.plot(self.t_plt, self.plot_12) #Q_wall_vap_in
+        plt.show()
+        
+        plt.ylabel('Q_wall_liq_in')
+        plt.plot(self.t_plt, self.plot_13) #Q_wall_liq_in 
+        plt.show()
+        
+        plt.ylabel('Q_wall_vap_cond')
+        plt.plot(self.t_plt, self.plot_14) #Q_wall_vap_cond
+        plt.show()
+        
+        plt.ylabel('Q_wall_liq_cond')
+        plt.plot(self.t_plt, self.plot_15) #Q_wall_liq_cond
+        plt.show()
+        
+        plt.ylabel('m_wall_vap_in')
+        plt.plot(self.t_plt, self.plot_16) #m_wall_vap_in 
+        plt.show()
+        
+        plt.ylabel('m_wall_liq_in')
+        plt.plot(self.t_plt, self.plot_17) #m_wall_liq_in
+        plt.show()
+        
+        plt.ylabel('T_wall_vap')
+        plt.plot(self.t_plt, self.plot_18) #T_wall_vap
+        plt.show()
+        
+        plt.ylabel('T_wall_liq')
+        plt.plot(self.t_plt, self.plot_19) #T_wall_liq
+        plt.show()
+
+
+
 
     def Dim_Calcs(self, m_liq, rho_liq):
-        
+        ###########
+        ###NEED TO ADD CALCULATION FOR VOLUME OF WALL VAPOR AND LIQUID REGIONS
+        ###########
+
         V_liq = m_liq / rho_liq #m^3 | volume of liquid in tank
         V_vap = self.V_tank - V_liq #m^3 | volume of vapor in tank
         L_liq = V_liq / (np.pi * self.ri**2) #m | Length of liquid region
@@ -92,8 +297,8 @@ class Model(object):
         A_liq_out = 2 * np.pi * self.ro * L_liq #m^2 | outter surface area of tank liquid region
         A_vap_out = 2 * np.pi * self.ro * L_vap #m^2 | outter surface area of tank vapor region
 
-        m_wall_liq = np.pi * (self.ro**2 - self.ri**2) * L_liq * self.rho_wall #kg | mass of wall in liqquid region
-        m_wall_vap = np.pi * (self.ro**2 - self.ri**2) * L_vap * self.rho_wall #kg | mass of wall in liqquid region
+        m_wall_liq = np.pi * (self.ro**2 - self.ri**2) * L_liq * self.rho_wall #kg | mass of wall in liquid region
+        m_wall_vap = np.pi * (self.ro**2 - self.ri**2) * L_vap * self.rho_wall #kg | mass of wall in liquid region
         
         
         return V_liq, V_vap, L_liq, L_vap, A_liq_in, A_vap_in, A_liq_out, A_vap_out, m_wall_liq, m_wall_vap
@@ -153,7 +358,14 @@ class Model(object):
         enthalpy_vap = PropsSI('H', 'T', T, 'P', P, 'N2O') #J/kg
         #Saturation Enthalpy
         enthalpy_vap_sat = PropsSI('H', 'T', T, 'Q', 1, 'N2O') #J/kg
-        
+        #Saturation Pressure
+        P_sat = PropsSI('P','T',T,'Q',1,'N2O') #Pa
+        #Molar Mass
+        MM = PropsSI('M','T',T,'P',P,'N2O') #kg/mol
+        #Compressibility Factor
+        Z_vap = PropsSI('Z','T',T,'P',P,'N2O')
+        #Gas Constant
+        R_vap = PropsSI('GAS_CONSTANT','T',T,'P',P,'N2O') #J/mol/K 
         #The Following from... "Thermophysical properties of nitrous oxide" from IHS ESDU
         #Viscosity from EQ 4.9
         mu_vap = np.exp(3.3281 + (-1.18237) * (1/(T/309.59) - 1)**(1/3) + (-0.055155) * (1/(T/309.59) - 1)**(4/3)) #microNs/m^2
@@ -162,7 +374,7 @@ class Model(object):
         k_vap =  np.exp(-7.0887 + (-0.276962) * (1-(T/309.59))**(-2/3) + 2.8872 * (1-(T/309.59))**(-1/3) + 16.6116 * \
                     (1-(T/309.59))**(1/3) + (-11.8221) * (1-(T/309.59))**(2/3)) #mW/m/K
         k_vap = k_vap/1000 #W/m/K
-        return Cp_vap, rho_vap, mu_vap, k_vap, beta_vap, enthalpy_vap, enthalpy_vap_sat
+        return Cp_vap, rho_vap, mu_vap, k_vap, beta_vap, enthalpy_vap, enthalpy_vap_sat, P_sat, MM, Z_vap, R_vap
 
 
         #z = [self.T_wall_vap, 0, 0,   self.T_wall_liq, self.T_lv_surf, self.T_liq, self.T_vap, self.V_liq, self.V_vap,\
@@ -170,34 +382,57 @@ class Model(object):
 
         #z = [0, 0, 0, 0, 0     ]
 
-    def ODE(self, z, t):
+    def ODE(self, z, delta_t):
+
         ###Need to rearrange initial conditions to match derivatives taken
-        
+
+
         Q_liq_surf = z[0]        
         Q_surf_vap = z[1]        
         Q_wall_vap_out = z[2]  
         Q_wall_liq_out = z[3]        
         m_evap = z[4]
+        m_cond = z[5]
+        m_vap = z[6]
+        Q_in_vap = z[7]
+        Q_in_liq = z[8]
+        rho_vap = z[9]
+        L_vap = z[10]
+        V_wall_vap = z[11]
+        Q_wall_vap_in = z[12]
+        Q_wall_liq_in = z[13]
+        Q_wall_vap_cond = z[14]
+        Q_wall_liq_cond = z[15]
+        m_wall_vap_in = z[16]
+        m_wall_liq_in = z[17]
+        T_wall_vap = z[18]
+        T_wall_liq = z[19]
 
+        """
         print(Q_liq_surf)
         print(Q_surf_vap)
         print(Q_wall_vap_out)
         print(Q_wall_liq_out)
         print(m_evap)
-
-        T_wall_vap = self.T_atm
+        print(m_cond)
+        print(m_vap)
+        print(Q_in_vap)
+        print(Q_in_liq)
+        print(rho_vap)
+        """
+        #T_wall_vap = self.T_atm
         #Q_wall_vap_in = z[1]
 
         #Q_wall_vap_cond = z[3]
         #m_wall_vap_in = z[4]
-        T_wall_liq = self.T_atm
+        #T_wall_liq = self.T_atm
         #Q_wall_liq_in = z[6]
 
         #Q_wall_liq_cond = z[8]
         #m_wall_liq_in = z[9]
         #m_vap = z[10]
-        m_liq = self.m_liq
 
+        self.m_liq -= self.M_dot
 
 
         #m_cond = z[15]
@@ -213,32 +448,34 @@ class Model(object):
         #P_liq = z[26]
         #m_out = z[27]
 
-        dim = self.Dim_Calcs(m_liq, self.rho_liq)
+        dim = self.Dim_Calcs(self.m_liq, self.rho_liq)
 
         #V_liq = dim[0]
-        #V_vap = dim[1]
+        V_vap = dim[1]
         L_liq = dim[2]
-        L_vap = dim[3]
+        #L_vap = dim[3]
         A_liq_in = dim[4]
         A_vap_in = dim[5]
-        #A_liq_out = dim[6]
-        #A_vap_out = dim[7]
-        #m_wall_liq = dim[8]
-        #m_wall_vap = dim[9]
+        A_liq_out = dim[6]
+        A_vap_out = dim[7]
+        m_wall_liq = dim[8]
+        m_wall_vap = dim[9]
 
         P = 101325 * 800 
+        self.dV_vap_dt = abs(V_vap) - abs(self.dV_vap_dt)
 
-        """
+
         #The film temperature between air and vapor wall region
         T_film_wall_vap = 0.5 * (z[0] + self.T_atm)
         #Finds air properties at film temp and atmospheric pressure
-        Air = self.thermo_air(T_film_wall_vap, 101325)
+        Air = self.thermo_air(T_film_wall_vap, self.P_atm)
         Cp_air = Air[0]
         rho_air = Air[1]
         mu_air = Air[2]
         k_air = Air[3]
         beta_air = Air[4]
-        """
+
+
         T_film_liq_surf = 0.5 * (T_vap + T_liq)
         N2O_liq = self.Thermo_N2O_Liq(T_film_liq_surf, P)
         Cp_liq = N2O_liq[0]
@@ -251,33 +488,122 @@ class Model(object):
 
         N2O_vap = self.Thermo_N2O_Vap(T_film_liq_surf, P)
         Cp_vap = N2O_vap[0]
-        rho_vap = N2O_liq[1]
+        #rho_vap = N2O_liq[1]
         mu_vap = N2O_vap[2]
         k_vap = N2O_vap[3]
         beta_vap = N2O_vap[4]
         #enthalpy_vap = N2O_vap[5]
         enthalpy_vap_sat = N2O_vap[6]
+        P_sat = N2O_vap[7] +100
+        MM_vap = N2O_vap[8]
+        Z_vap = N2O_vap[9]
+        R_vap = N2O_vap[10]
 
 
         N2O_latent_heat = enthalpy_vap_sat - enthalpy_liq_sat
         if L_liq <= 0: #a hacky fix to avoid dividing by 0 in a filling model
             L_liq = 0.00000000001 #m |very hacky approach.......
-
+        
+        #dQ_liq_surf/dt
         EQ13 = (0.15 * ((Cp_liq * rho_liq**2 * g * beta_liq * abs(T_film_liq_surf - T_liq ) * L_liq**3 ) \
                 / (mu_liq * k_liq ) )**(1/3) * (k_liq/L_liq)) * A_liq_in * (T_film_liq_surf - T_liq)
-
+        
+        #dQ_surf_vap/dt
         EQ14 = (0.15 * ((Cp_vap * rho_vap**2 * g * beta_vap * abs(T_film_liq_surf - T_vap) * L_vap**3 )   \
                 / (mu_vap * k_vap ) )**(1/3) * (k_liq/L_vap)) * A_vap_in * (T_film_liq_surf - T_liq)
-
+        
+        #dQ_wall_vap_out/dt
         EQ2 = (0.021 * ((Cp_vap * rho_vap**2 * g * beta_vap * abs(T_wall_vap - T_vap) * L_vap**3  ) \
                 / (mu_vap * k_vap ) )**(2/5) * (k_vap/L_vap)) * A_vap_in * (T_wall_vap - T_vap)
 
+        #dQ_wall_liq_out/dt
         EQ7 = (0.021 * ((Cp_liq * rho_liq**2 * g * beta_liq * abs(T_wall_liq - T_liq) * L_liq**3  ) \
                 / (mu_liq * k_liq ) )**(2/5) * (k_liq/L_liq)) * A_liq_in * (T_wall_liq - T_liq)
 
+        #dm_evap/dt
         EQ12 = (EQ13 - EQ14) / (N2O_latent_heat + (enthalpy_liq_sat - enthalpy_liq) )
+        
 
-        return EQ13, EQ14, EQ2, EQ7, EQ12
+        #NEED TO CHECK CAN PRODUCE ERROR...
+        
+        #dm_cond/dt
+        if P > P_sat:
+            EQ15 = ( ( P - P_sat) * V_vap * MM_vap ) / (Z_vap * R_vap  * T_vap * delta_t )
+        elif P <= P_sat: 
+            EQ15 = 0
+
+        #dm_vap
+        EQ10 = EQ12 - EQ15
+
+        #dQ_in_vap
+        EQ24 = EQ2 + EQ14
+
+        #dQ_in_liq
+        EQ25 = EQ7 + EQ13
+
+
+        #ERRORs.... Need a more accurate description of dV_vap_dt...
+        
+        #d_rho_vap/dt
+        EQ18 = 1/V_vap * EQ10 - m_vap / (V_vap)**2 * self.dV_vap_dt
+        
+        #############
+        ####NEED TO CHECK FOR UNCERTAINTY IN MEASURING THE HEIGHT.....
+        #avoids having a 0 vapor density if the tank is completely empty, forces the Length of the vapor region to equal 0... 
+        
+        #dL_vap/dt
+        if rho_vap == 0:
+            EQ29 = 0
+        else:
+            EQ29 = 1/(np.pi * self.ri**2) * ((1/rho_vap) * EQ10 - (m_vap/rho_vap) * EQ18)
+
+        ##### The rate of change of the vapor height needs to be checked....
+
+        #dV_wall_vap/dt
+        EQ31 = np.pi * (self.ro**2 - self.ri**2) * EQ29
+
+        #dQ_wall_vap_in/dt
+        EQ1 = (0.59 * (  (Cp_air * (rho_air )**2 * g * beta_air * abs(T_wall_vap - self.T_atm) * L_vap**3)  \
+                / (mu_air * k_air ) )**(0.25) * (k_air/L_vap)) * A_vap_out * (T_wall_vap - self.T_atm)
+
+        #dQ_wall_liq_in/dt
+        EQ6 = (0.59 * (  (Cp_air * (rho_air )**2 * g * beta_air * abs(T_wall_liq - self.T_atm) * L_liq**3)  \
+                / (mu_air * k_air ) )**(0.25) * (k_air/L_liq)) * A_liq_out * (T_wall_liq - self.T_atm)        
+
+
+        #############
+        # Note:
+        # for EQ3 and EQ8 the sign of T_wall_liq - T_wall_vap may have to be reversed to that the heat transfer into a section
+        # is proportional to te heat transfer out of a section maintaining an equvilancy.
+        #############
+        #dQ_wall_vap_cond/dt
+        EQ3 = (self.k_wall * (T_wall_liq - T_wall_vap) * np.pi * (self.ro**2 - self.ri**2)) \
+                / (0.5 * L_liq + 0.5 * L_vap)
+
+        #dQ_wall_liq_cond/dt
+        EQ8 = (self.k_wall * (T_wall_vap - T_wall_liq) * np.pi * (self.ro**2 - self.ri**2)) \
+                / (0.5 * L_liq + 0.5 * L_vap)
+
+        #dm_wall_vap_in/dt
+        EQ4 = EQ31 * self.rho_wall
+        
+        #dm_wall_liq_in/dt 
+        EQ9 = -EQ31 * self.rho_wall
+        
+        #dT_wall_vap/dt
+        #DOUBLE CHECK T_wall_liq as T_w_in from EQs
+
+        EQ0 = (EQ1 - EQ2 + EQ3 + EQ4 * self.C_wall * (T_wall_liq - T_wall_vap)) \
+                / (m_wall_vap * self.C_wall)
+        
+        #dT_wall_vap/dt
+        EQ5 = (EQ6 - EQ7 + EQ8 + EQ9 * self.C_wall * (T_wall_vap - T_wall_liq)) \
+                / (m_wall_liq * self.C_wall)
+
+        #dU_vap/dt
+        #EQ17 = EQ12 * h_evap - EQ15 * h_cond - P * EQ22 + EQ24
+
+        return EQ13, EQ14, EQ2, EQ7, EQ12, EQ15, EQ10, EQ24, EQ25, EQ18, EQ29, EQ31, EQ1, EQ6, EQ3, EQ8, EQ4, EQ9, EQ0, EQ5
 
 
 
@@ -290,8 +616,6 @@ Model()
         dz[0] = (dz[1] - dz[2] + dz[3] + dz[4] * self.C_wall * (self.T_wall_vap - z[0]) )/ \
                 self.m_wall_vap * self.C_wall 
 
-        dz[1] = (0.59 * ((Cp_air * (rho_air )**2 * g * beta_air * abs(z(1) - self.T_atm) * z(30)**3  )\
-                / (mu_air * k_air ) )**(0.25) * (k_air/z(30))) * A_wall_vap_out * (z(1) - self.T_atm)
 
         dz[2] = (0.021 * ((Cp_vap * (z(19) )^2 * g * biot_vap * abs(z(1) - z(17)) * z(30)^3  )\
                 / (mu_vap * k_vap )   )^(2/5) * (k_vap/z(30))) * A_wall_vap_inside * (z(1) - z(17))
