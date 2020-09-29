@@ -1,6 +1,12 @@
 """
 OOrtiz
-V: 1.0
+V: 1.1
+
+Modeling Equations from 
+"Review and Evalution of Models for 
+Self-Pressurizing Propellant Tank Dynamics"
+Zimmerman, J.E., Waxman, B.S., Cantwell, B.J.,
+Zilliac, G.G. 49th Joint Propulsion Conference, 2013  
 
 """
 
@@ -13,7 +19,7 @@ import os
 
 class Model(object):
     def __init__(self):
-        clear = os.system('cls')
+        self.clear = os.system('cls')
         #graviational acceleration
         global g
         g = 9.81 #m/s^2
@@ -39,9 +45,9 @@ class Model(object):
         self.fill_percent = 50 #% 
 
         #atmospheric temperature
-        self.T_atm = 28 + 273.15 #K | atmospheric temperature
+        self.T_atm = 30 + 273.15 #K | atmospheric temperature
         self.P_atm = 101325 #Pa | atmospheric pressure 
-
+        self.P_out = 6894800 #Pa | Pressure Inlet (Should eventually vary with source pressure)
 
         #timestep
         self.delta_t = 0 #s
@@ -49,9 +55,9 @@ class Model(object):
         #Temperature of the Vapor part of wall
         self.T_wall_vap = self.T_atm #K | wall temperature at vapor region
         self.T_wall_liq = self.T_atm #K | wall temperature at liquid region
-        self.T_lv_surf = 28 + 273.15 #K | inside temeprature at liquid vapor boundry
-        self.T_liq = 28 + 273.15 #K | liquid temperature
-        self.T_vap = 28 + 273.15 #K | vapor temperature
+        self.T_lv_surf = 22 + 273.15 #K | inside temeprature at liquid vapor boundry
+        self.T_liq = 20 + 273.15 #K | liquid temperature
+        self.T_vap = 22 + 273.15 #K | vapor temperature
         
         
         N2O_mass = 15.0 #kg | Total mass of N2O
@@ -59,11 +65,11 @@ class Model(object):
         t_stop = 600 #s () | total process time
         
         #eventually will chage m_dot to more accurately model pass flow rate
-        self.M_dot = N2O_mass / t_stop #kg/s |mass flow rate
+        self.M_dot = - N2O_mass / t_stop #kg/s |mass flow rate
         
 
         
-        init_dim = self.Dim_Calcs((N2O_mass * fill_percent),PropsSI('D','T',self.T_wall_liq,'Q',0,'N2O'))        
+        init_dim = self.Dim_Calcs((N2O_mass * fill_percent),PropsSI('D','T',self.T_liq,'Q',0,'N2O'))        
         
         self.V_liq = init_dim[0]
         self.V_vap = init_dim[1]
@@ -79,19 +85,24 @@ class Model(object):
         self.V_wall_vap = np.pi * (self.ro**2 - self.ri**2) * self.L_vap
 
         self.m_liq = N2O_mass * fill_percent
-        self.rho_liq = PropsSI('D','T',self.T_wall_liq,'Q',0,'N2O')
+        self.rho_liq = PropsSI('D','T',self.T_liq,'Q',0,'N2O')
         
         #Change Pressure Input 
         #P = 101325 * (1000/14) #initial Pressure 
 
         ##Assuming all heat conduction equals 0 at start....
         self.z = [0, 0, 0, 0, 0, 0,\
-             0, 0, 0, PropsSI('D','T',self.T_atm,'Q',1,'N2O'), self.L_vap, self.V_wall_vap ,\
-             0, 0, 0, 0, 0, 0, self.T_atm, self.T_atm] 
+             0, 0, 0, PropsSI('D','T',self.T_vap,'Q',1,'N2O'), self.L_vap, self.V_wall_vap ,\
+             0, 0, 0, 0, 0, 0, self.T_atm-20, self.T_atm-20, self.m_liq, self.rho_liq, self.m_liq * PropsSI('U','P' , self.P_out, 'T',self.T_vap, 'N2O')] 
+
         #self.x = odeint(self.ODE, self.z, self.tspan)
         self.t = 0 #s | time counter
         self.t_step = 0.1 #s |time step
-
+        
+        #######
+        ## FOR TESTING PURPOSES ONLY
+        #######
+        
         self.t_plt = []
         self.plot_0 = []
         self.plot_1 = []
@@ -113,44 +124,14 @@ class Model(object):
         self.plot_17 = []
         self.plot_18 = []
         self.plot_19 = []
-        #self.plot_20 = []
+        self.plot_20 = []
+        self.plot_21 = []
+        ##########################
 
-        k = 10
+        k = 1000
+
         for i in range(0,k):
-            if i == 0:
-                clear
-                print("__________ | 0%")
-            elif i/k == 0.1:
-                clear
-                print("#_________ | 10%")
-            elif i/k == 0.2:
-                clear
-                print("##________ | 20%")        
-            elif i/k == 0.3:
-                clear
-                print("###_______ | 30%")
-            elif i/k == 0.4:
-                clear
-                print("####______ | 40%") 
-            elif i/k == 0.5:
-                clear
-                print("#####_____ | 50%") 
-            elif i/k == 0.6:
-                clear
-                print("######____ | 60%")
-            elif i/k == 0.7:
-                clear
-                print("#######___ | 70%")        
-            elif i/k == 0.8:
-                clear
-                print("########__ | 80%")
-            elif i/k == 0.9:
-                clear
-                print("#########_ | 90%") 
-            elif i/k >= 0.99999:
-                clear
-                print("########## | 100%") 
-
+            self.count_bar(i,k)
 
             ######
             # FOR TESTING PURPOSES ONLY
@@ -176,19 +157,20 @@ class Model(object):
             self.plot_17.append(self.z[17]) #m_wall_liq_in
             self.plot_18.append(self.z[18]) #T_wall_vap
             self.plot_19.append(self.z[19]) #T_wall_liq
-            #self.plot_20.append(self.z[20]) #                        
+            self.plot_20.append(self.z[20]) #m_liq                       
             #self.plot_21.append(self.z[21]) #
 
 
 
 
 
-            info = self.ODE(self.z, self.t_step)
+            answer = self.ODE(self.z, self.t_step)
             #Initial conditions plus rate of change.... 
-            self.z += np.dot(self.t_step, info)
+            self.z += np.dot(self.t_step, answer)
             self.t += self.t_step        
 
-        self.Visualize()
+        #self.Visualize()
+        print(self.z)
 
 
     def Visualize(self): # used to plot the data, toggle graphs on and off...
@@ -275,7 +257,9 @@ class Model(object):
         plt.plot(self.t_plt, self.plot_19) #T_wall_liq
         plt.show()
 
-
+        plt.ylabel('m_liq')
+        plt.plot(self.t_plt, self.plot_20) #m_liq
+        plt.show()
 
 
     def Dim_Calcs(self, m_liq, rho_liq):
@@ -382,6 +366,15 @@ class Model(object):
 
         #z = [0, 0, 0, 0, 0     ]
 
+    def Enthalpy_calc(self, P):
+        ####
+        # Should eventually vary with Pressure instead of density....
+        ####
+        h_evap = PropsSI('H', 'P', P, 'Q', 1, 'N2O') #J/kg | evaporation specific enthalpy
+        h_cond = PropsSI('H', 'P', P, 'Q', 0, 'N2O') #J/kg | condensation specific enthalpy
+
+        return h_evap, h_cond
+
     def ODE(self, z, delta_t):
 
         ###Need to rearrange initial conditions to match derivatives taken
@@ -407,33 +400,10 @@ class Model(object):
         m_wall_liq_in = z[17]
         T_wall_vap = z[18]
         T_wall_liq = z[19]
-
-        """
-        print(Q_liq_surf)
-        print(Q_surf_vap)
-        print(Q_wall_vap_out)
-        print(Q_wall_liq_out)
-        print(m_evap)
-        print(m_cond)
-        print(m_vap)
-        print(Q_in_vap)
-        print(Q_in_liq)
-        print(rho_vap)
-        """
-        #T_wall_vap = self.T_atm
-        #Q_wall_vap_in = z[1]
-
-        #Q_wall_vap_cond = z[3]
-        #m_wall_vap_in = z[4]
-        #T_wall_liq = self.T_atm
-        #Q_wall_liq_in = z[6]
-
-        #Q_wall_liq_cond = z[8]
-        #m_wall_liq_in = z[9]
-        #m_vap = z[10]
-
-        self.m_liq -= self.M_dot
-
+        m_liq = z[20]
+        rho_liq = z[21]
+        U_vap = z[22]
+       
 
         #m_cond = z[15]
         T_vap = self.T_atm
@@ -448,9 +418,9 @@ class Model(object):
         #P_liq = z[26]
         #m_out = z[27]
 
-        dim = self.Dim_Calcs(self.m_liq, self.rho_liq)
+        dim = self.Dim_Calcs(m_liq, rho_liq)
 
-        #V_liq = dim[0]
+        V_liq = dim[0]
         V_vap = dim[1]
         L_liq = dim[2]
         #L_vap = dim[3]
@@ -479,7 +449,7 @@ class Model(object):
         T_film_liq_surf = 0.5 * (T_vap + T_liq)
         N2O_liq = self.Thermo_N2O_Liq(T_film_liq_surf, P)
         Cp_liq = N2O_liq[0]
-        rho_liq = N2O_liq[1]
+        #rho_liq = N2O_liq[1]
         mu_liq = N2O_liq[2]
         k_liq = N2O_liq[3]
         beta_liq = N2O_liq[4]
@@ -501,7 +471,7 @@ class Model(object):
 
 
         N2O_latent_heat = enthalpy_vap_sat - enthalpy_liq_sat
-        if L_liq <= 0: #a hacky fix to avoid dividing by 0 in a filling model
+        if L_liq == 0: #a hacky fix to avoid dividing by 0 in a filling model
             L_liq = 0.00000000001 #m |very hacky approach.......
         
         #dQ_liq_surf/dt
@@ -600,29 +570,68 @@ class Model(object):
         EQ5 = (EQ6 - EQ7 + EQ8 + EQ9 * self.C_wall * (T_wall_vap - T_wall_liq)) \
                 / (m_wall_liq * self.C_wall)
 
+
+        ###Note:
+        # Change all M_dot later on...
+        ###
+        #dm_liq/dt
+        EQ11 = -EQ12 + EQ15 - self.M_dot
+
+
+        #####
+        # Note:
+        # Change V_liq to vary with time in a more elegant manner........
+        #####
+        #drho_liq/dt
+        if V_liq == 0: #|temporarily fixes no liquid volume .....
+            EQ21 = self.rho_liq
+        else:
+            EQ21 = 1/V_liq * EQ11 - (m_liq / V_liq**2) * (-self.dV_vap_dt)
+
+        H_vap_calc = self.Enthalpy_calc(self.P_out)
+
         #dU_vap/dt
-        #EQ17 = EQ12 * h_evap - EQ15 * h_cond - P * EQ22 + EQ24
+        EQ17 = EQ12 * H_vap_calc[0] - EQ15 * H_vap_calc[1] - P * self.dV_vap_dt + EQ24
 
-        return EQ13, EQ14, EQ2, EQ7, EQ12, EQ15, EQ10, EQ24, EQ25, EQ18, EQ29, EQ31, EQ1, EQ6, EQ3, EQ8, EQ4, EQ9, EQ0, EQ5
+        return EQ13, EQ14, EQ2, EQ7, EQ12, EQ15, EQ10, EQ24, EQ25, EQ18,\
+                 EQ29, EQ31, EQ1, EQ6, EQ3, EQ8, EQ4, EQ9, EQ0, EQ5, EQ11, EQ21, \
+                     EQ17
 
 
+
+    def count_bar(self,i,k):
+        if i == 0:
+            self.clear
+            print("__________ | 0%")
+        elif i/k == 0.1:
+            self.clear
+            print("#_________ | 10%")
+        elif i/k == 0.2:
+            self.clear
+            print("##________ | 20%")        
+        elif i/k == 0.3:
+            self.clear
+            print("###_______ | 30%")
+        elif i/k == 0.4:
+            self.clear
+            print("####______ | 40%") 
+        elif i/k == 0.5:
+            self.clear
+            print("#####_____ | 50%") 
+        elif i/k == 0.6:
+            self.clear
+            print("######____ | 60%")
+        elif i/k == 0.7:
+            self.clear
+            print("#######___ | 70%")        
+        elif i/k == 0.8:
+            self.clear
+            print("########__ | 80%")
+        elif i/k == 0.9:
+            self.clear
+            print("#########_ | 90%") 
+        elif i/k >= 0.99999:
+            self.clear
+            print("########## | 100%")         
 
 Model()
-
-
-
-
-"""
-        dz[0] = (dz[1] - dz[2] + dz[3] + dz[4] * self.C_wall * (self.T_wall_vap - z[0]) )/ \
-                self.m_wall_vap * self.C_wall 
-
-
-        dz[2] = (0.021 * ((Cp_vap * (z(19) )^2 * g * biot_vap * abs(z(1) - z(17)) * z(30)^3  )\
-                / (mu_vap * k_vap )   )^(2/5) * (k_vap/z(30))) * A_wall_vap_inside * (z(1) - z(17))
-
-
-
-        self.m_wall_vap += dz[4]
-        
-"""
-
