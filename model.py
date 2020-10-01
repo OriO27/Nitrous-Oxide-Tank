@@ -63,37 +63,61 @@ class Model(object):
         N2O_mass = 15.0 #kg | Total mass of N2O
         fill_percent = 0 #% | percentage initially filled with liquid N2O
         t_stop = 600 #s () | total process time
-        
+
+        self.fill = True #TRUE: Tank is filling with N2O | FALSE: Tank is emptying N2O
+
         #eventually will chage m_dot to more accurately model pass flow rate
-        self.M_dot = - N2O_mass / t_stop #kg/s |mass flow rate
+        if self.fill == True: # mass flow rate is negative with respect to the outlet (going in)
+            self.M_dot = - N2O_mass / t_stop #kg/s |mass flow rate
+            #All initial values will be 0 to reflect a perfectly empty tank (will add gaseous content later...)
+            self.V_liq = 0
+            self.V_vap = 0
+            self.L_liq = 0 
+            self.L_vap = 0
+            self.A_liq_in = 0
+            self.A_vap_in = 0
+            self.A_liq_out = 0
+            self.A_vap_out = 0
+            self.m_wall_liq = 0
+            self.m_wall_vap = 0
+            self.V_wall_vap = 0
+            self.m_liq = 0
+            self.rho_liq = 0
+            U_vap = 0
+            U_liq = 0
+            T_vap = 0
+            T_liq = 0
         
+        elif self.fill == False: #mass flow rate is positive with respect to the outlet (going out)
+            self.M_dot = N2O_mass / t_stop #kg/s | mass flow rate
+            #calculate initial length, area, and volume dimensions
+            init_dim = self.Dim_Calcs((N2O_mass * fill_percent),PropsSI('D','T',self.T_liq,'Q',0,'N2O'))        
+            self.V_liq = init_dim[0]
+            self.V_vap = init_dim[1]
+            self.L_liq = init_dim[2]
+            self.L_vap = init_dim[3]
+            self.A_liq_in = init_dim[4]
+            self.A_vap_in = init_dim[5]
+            self.A_liq_out = init_dim[6]
+            self.A_vap_out = init_dim[7]
+            self.m_wall_liq = init_dim[8]
+            self.m_wall_vap = init_dim[9]
+            self.V_wall_vap = np.pi * (self.ro**2 - self.ri**2) * self.L_vap
 
-        
-        init_dim = self.Dim_Calcs((N2O_mass * fill_percent),PropsSI('D','T',self.T_liq,'Q',0,'N2O'))        
-        
-        self.V_liq = init_dim[0]
-        self.V_vap = init_dim[1]
-        self.L_liq = init_dim[2]
-        self.L_vap = init_dim[3]
-        self.A_liq_in = init_dim[4]
-        self.A_vap_in = init_dim[5]
-        self.A_liq_out = init_dim[6]
-        self.A_vap_out = init_dim[7]
-        self.m_wall_liq = init_dim[8]
-        self.m_wall_vap = init_dim[9]
+            self.m_liq = N2O_mass * fill_percent
+            self.m_vap = (1 - fill_percent) * N2O_mass
 
-        self.V_wall_vap = np.pi * (self.ro**2 - self.ri**2) * self.L_vap
-
-        self.m_liq = N2O_mass * fill_percent
-        self.rho_liq = PropsSI('D','T',self.T_liq,'Q',0,'N2O')
-        
-        #Change Pressure Input 
-        #P = 101325 * (1000/14) #initial Pressure 
+            self.rho_liq = PropsSI('D','T',self.T_liq,'Q',0,'N2O')
+            U_vap = self.m_vap * PropsSI('U','P' , self.P_out, 'T',self.T_vap, 'N2O')
+            U_liq = self.m_liq * PropsSI('U','P' , self.P_out, 'T',self.T_liq, 'N2O')
+            T_vap = self.T_atm - 2 #Change initial temp
+            T_liq = self.T_atm - 3 #change initial temp
 
         ##Assuming all heat conduction equals 0 at start....
         self.z = [0, 0, 0, 0, 0, 0,\
              0, 0, 0, PropsSI('D','T',self.T_vap,'Q',1,'N2O'), self.L_vap, self.V_wall_vap ,\
-             0, 0, 0, 0, 0, 0, self.T_atm-20, self.T_atm-20, self.m_liq, self.rho_liq, self.m_liq * PropsSI('U','P' , self.P_out, 'T',self.T_vap, 'N2O')] 
+             0, 0, 0, 0, 0, 0, self.T_atm-20, self.T_atm-20, self.m_liq, self.rho_liq, U_vap,\
+                 U_liq, T_vap, T_liq ] 
 
         #self.x = odeint(self.ODE, self.z, self.tspan)
         self.t = 0 #s | time counter
@@ -126,6 +150,8 @@ class Model(object):
         self.plot_19 = []
         self.plot_20 = []
         self.plot_21 = []
+
+        self.Plot_store = []
         ##########################
 
         k = 1000
@@ -137,6 +163,8 @@ class Model(object):
             # FOR TESTING PURPOSES ONLY
             ######
             self.t_plt.append(self.t)
+
+            
             self.plot_0.append(self.z[0]) #Q_liq_surf
             self.plot_1.append(self.z[1]) #Q_surf_vap           
             self.plot_2.append(self.z[2]) #Q_wall_vap_out 
@@ -159,7 +187,7 @@ class Model(object):
             self.plot_19.append(self.z[19]) #T_wall_liq
             self.plot_20.append(self.z[20]) #m_liq                       
             #self.plot_21.append(self.z[21]) #
-
+            
 
 
 
@@ -169,9 +197,9 @@ class Model(object):
             self.z += np.dot(self.t_step, answer)
             self.t += self.t_step        
 
-        #self.Visualize()
+        self.Visualize()
         print(self.z)
-
+        #print(new)
 
     def Visualize(self): # used to plot the data, toggle graphs on and off...
         #For Testing Purposes....
@@ -269,10 +297,13 @@ class Model(object):
 
         V_liq = m_liq / rho_liq #m^3 | volume of liquid in tank
         V_vap = self.V_tank - V_liq #m^3 | volume of vapor in tank
+        if V_liq + V_vap > self.V_tank:
+            print("Error in volume calcs...")
+        
         L_liq = V_liq / (np.pi * self.ri**2) #m | Length of liquid region
         L_vap = V_vap / (np.pi * self.ri**2) #m | Length of vapor region
         if L_liq + L_vap > self.L_tank:
-            print("Error in length calcs....")
+            print("Error in length calcs...")
         
         #Note::: Surface area does not include end caps; hollow tube assumed
         A_liq_in = 2 * np.pi * self.ri * L_liq #m^2 |inner surface area of tank liquid region
@@ -372,8 +403,14 @@ class Model(object):
         ####
         h_evap = PropsSI('H', 'P', P, 'Q', 1, 'N2O') #J/kg | evaporation specific enthalpy
         h_cond = PropsSI('H', 'P', P, 'Q', 0, 'N2O') #J/kg | condensation specific enthalpy
-
-        return h_evap, h_cond
+        
+        ######
+        # h_out ...will be intresting to model with inward flow since it will be dependent on the source 
+        # tank exit conditions and the losses which occur in the line. 
+        ######
+        
+        h_out = PropsSI('H', 'P', P, 'Q', 0, 'N2O') #J/kg  | outlet specific enthalpy | Assumes liquid is going in/out....
+        return h_evap, h_cond, h_out
 
     def ODE(self, z, delta_t):
 
@@ -403,6 +440,9 @@ class Model(object):
         m_liq = z[20]
         rho_liq = z[21]
         U_vap = z[22]
+        U_liq = z[23]
+        T_vap = z[24]
+        T_liq = z[25]
        
 
         #m_cond = z[15]
@@ -588,14 +628,42 @@ class Model(object):
         else:
             EQ21 = 1/V_liq * EQ11 - (m_liq / V_liq**2) * (-self.dV_vap_dt)
 
+        #####
+        # assumes that the pressure at the exit is the same as the liquid pressure
+        # which is the same as the vapor pressure
+        #####
+
         H_vap_calc = self.Enthalpy_calc(self.P_out)
 
         #dU_vap/dt
         EQ17 = EQ12 * H_vap_calc[0] - EQ15 * H_vap_calc[1] - P * self.dV_vap_dt + EQ24
+        
+        #####
+        # for EQ 20 check sign on "P *self.dV_vap_dt"... might be positive if using the vapor volume rate of change
+        # 
+        #####
+
+        #dU_liq/dt
+        EQ20 = self.M_dot * H_vap_calc[2] - EQ12 * H_vap_calc[0] + EQ15 * H_vap_calc[1] - P * self.dV_vap_dt + EQ25
+
+        ########    
+        # NEED TO ADD A TOTAL INTERNAL ENERGY COUNTER
+        # FOR BOTH THE VAPOR AND LIQUID REGIONS TO THEN USE FOR THE 
+        # SPECIFIC ENERGY CALCS....
+        ########
+
+        #dT_vap/dt
+        EQ16 = 1 / Cp_vap * (1/m_vap * (EQ17 - EQ))
+
+        #dT_liq/dit
+        EQ19 = 
+    
+        #0 , 1, 2
+        #h_evap, h_cond, h_out
 
         return EQ13, EQ14, EQ2, EQ7, EQ12, EQ15, EQ10, EQ24, EQ25, EQ18,\
                  EQ29, EQ31, EQ1, EQ6, EQ3, EQ8, EQ4, EQ9, EQ0, EQ5, EQ11, EQ21, \
-                     EQ17
+                     EQ17, EQ20, EQ16, EQ19
 
 
 
