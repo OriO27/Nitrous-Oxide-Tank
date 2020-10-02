@@ -1,6 +1,6 @@
 """
 OOrtiz
-V: 1.2
+V: 1.3
 
 Modeling Equations from 
 "Review and Evalution of Models for 
@@ -8,7 +8,7 @@ Self-Pressurizing Propellant Tank Dynamics"
 Zimmerman, J.E., Waxman, B.S., Cantwell, B.J.,
 Zilliac, G.G. 49th Joint Propulsion Conference, 2013  
 
-TO DO
+TO DO:
     Allow multiple material's to be selected as initial tank 
         properties
     Make tank outlet pressure (P_out) [or inlet from the filling
@@ -19,7 +19,8 @@ TO DO
         surface area
     Add Air or an inert gas {N2} to the initially evacuated tank
     
-                   
+NOTES:
+    The print statements in the ODE method will be removed after testing
 """
 
 import numpy as np
@@ -35,7 +36,7 @@ class Model(object):
         global g
         g = 9.81 #m/s^2
         self.P_out = 6894800 #Pa | Pressure Inlet (Should eventually vary with source pressure)
-
+        self.T_out = 298.15 #K | Temporarily bypasses the errors encountered during the filling process....
         self.Initial_Conditions(Fill)
 
         if Fill == True:
@@ -78,8 +79,9 @@ class Model(object):
         self.plot_23 = []
         self.plot_24 = []
         self.plot_25 = []
+        self.plot_26 = []
 
-        k = 10
+        k = 2
         
 
         for i in range(0,k):
@@ -117,7 +119,7 @@ class Model(object):
             self.plot_23.append(self.z[23]) #U_liq
             self.plot_24.append(self.z[24]) #T_vap
             self.plot_25.append(self.z[25]) #T_liq
-
+            self.plot_25.append(self.z[26]) #T_liq
 
 
 
@@ -126,7 +128,7 @@ class Model(object):
             self.z += np.dot(self.t_step, answer)
             self.t += self.t_step        
 
-        self.Visualize()
+        #self.Visualize()
         print(self.z)
 
     def Initial_Conditions(self, Fill):
@@ -164,7 +166,7 @@ class Model(object):
         self.dV_vap_dt = 0 
 
     def Fill_Tank_IC(self):
-        self.P_tank = 30000 #Pa | Initially Evacuated, will add Air
+        self.P_tank = 90000 #Pa | Initially Evacuated, will add Air
         self.M_dot = - self.N2O_mass / self.t_total #Mass Flow Rate at Entrance
         Tank_IC = [
             0, #Q_liq_surf     
@@ -191,8 +193,9 @@ class Model(object):
             0, #rho_liq
             0, #U_vap
             0, #U_liq
-            0, #T_vap
-            0 #T_liq
+            self.T_atm, #T_vap
+            self.T_atm, #T_liq
+            self.P_tank #P_tank
         ]
        
         return Tank_IC
@@ -241,7 +244,8 @@ class Model(object):
             U_vap, #U_vap
             U_liq, #U_liq
             self.T_vap, #T_vap
-            self.T_liq #T_liq
+            self.T_liq, #T_liq
+            self.P_tank #P_tank
         ]
         return Tank_IC
 
@@ -250,96 +254,146 @@ class Model(object):
 
 
         plt.ylabel('Q_liq_surf')
+        plt.xlabel('Time (s)')        
         plt.plot(self.t_plt, self.plot_0) #Q_liq_surf
         plt.show()
 
-        plt.ylabel('Q_surf_vap')    
+        plt.ylabel('Q_surf_vap')
+        plt.xlabel('Time (s)')    
         plt.plot(self.t_plt, self.plot_1, '-', lw=2) #Q_surf_vap           
         plt.show()
 
         plt.ylabel('Q_wall_vap_out')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_2, '-', lw=2) #Q_wall_vap_out 
         plt.show()
 
         plt.ylabel('Q_wall_liq_out')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_3) #Q_wall_liq_out
         plt.show()
         
         plt.ylabel('m_evap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_4) #m_evap
         plt.show()        
         
         plt.ylabel('m_cond')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_5) #m_cond
         plt.show()
         
         plt.ylabel('m_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_6) #m_vap
         plt.show()
 
         plt.ylabel('Q_in_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_7) #Q_in_vap
         plt.show()
 
         plt.ylabel('Q_in_liq')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_8) #Q_in_liq
         plt.show()
         
         plt.ylabel('rho_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_9) #rho_vap 
         plt.show()
 
         plt.ylabel('L_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_10) #L_vap                        
         plt.show()
         
         plt.ylabel('V_wall_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_11) #V_wall_vap
         plt.show()
         
         plt.ylabel('Q_wall_vap_in')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_12) #Q_wall_vap_in
         plt.show()
         
         plt.ylabel('Q_wall_liq_in')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_13) #Q_wall_liq_in 
         plt.show()
         
         plt.ylabel('Q_wall_vap_cond')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_14) #Q_wall_vap_cond
         plt.show()
         
         plt.ylabel('Q_wall_liq_cond')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_15) #Q_wall_liq_cond
         plt.show()
         
         plt.ylabel('m_wall_vap_in')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_16) #m_wall_vap_in 
         plt.show()
         
         plt.ylabel('m_wall_liq_in')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_17) #m_wall_liq_in
         plt.show()
         
         plt.ylabel('T_wall_vap')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_18) #T_wall_vap
         plt.show()
         
         plt.ylabel('T_wall_liq')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_19) #T_wall_liq
         plt.show()
 
         plt.ylabel('m_liq')
+        plt.xlabel('Time (s)')
         plt.plot(self.t_plt, self.plot_20) #m_liq
         plt.show()
 
+        plt.ylabel('rho_liq')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_21) #rho_liq
+        plt.show()
+
+        plt.ylabel('U_vap')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_22) #U_vap
+        plt.show()
+
+        plt.ylabel('U_liq')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_23) #U_liq
+        plt.show()
+
+        plt.ylabel('T_vap')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_24) #T_vap
+        plt.show()
+
+        plt.ylabel('T_vap')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_25) #T_liq
+        plt.show()
+
+        plt.ylabel('P')
+        plt.xlabel('Time (s)')
+        plt.plot(self.t_plt, self.plot_26) #P
+        plt.show()
 
     def Dim_Calcs(self, m_liq, rho_liq):
         if rho_liq == 0:
             return 0,0,0,0,0,0,0,0,0,0,0,0
 
-            V_liq = m_liq / rho_liq #m^3 | volume of liquid in tank
-            V_vap = self.V_tank_hold - V_liq #m^3 | volume of vapor in tank
+        V_liq = m_liq / rho_liq #m^3 | volume of liquid in tank
+        V_vap = self.V_tank_hold - V_liq #m^3 | volume of vapor in tank
         
         if V_liq + V_vap > self.V_tank_hold:
             print("Error in volume calcs...")
@@ -462,6 +516,9 @@ class Model(object):
 
     def PDE(self, T, rho, m): #Used to approximate the partial derivative [del(u)/del(rho)]_T
         #+- 1% of the density
+        if rho <= 0:
+            return 0 #no approximate solution if density = 0
+
         rho_plus_1 = 1.01 * rho 
         rho_minus_1 = 0.99 * rho
         # using the high and low density values to calculate high and low 
@@ -512,7 +569,7 @@ class Model(object):
         U_liq = z[23]
         T_vap = z[24]
         T_liq = z[25]
-       
+        P = z[26]
 
         dim = self.Dim_Calcs(m_liq, rho_liq)
 
@@ -527,12 +584,14 @@ class Model(object):
         m_wall_liq = dim[8]
         m_wall_vap = dim[9]
 
-        P = 101325 * 800 
         self.dV_vap_dt = abs(V_vap) - abs(self.dV_vap_dt)
 
 
         #The film temperature between air and vapor wall region
         T_film_wall_vap = 0.5 * (z[0] + self.T_atm)
+        if T_film_wall_vap <= 183: #hacky approach to fix initial temperature starting at 0K due to evacuated tank... 
+            T_film_wall_vap = self.T_out
+        
         #Finds air properties at film temp and atmospheric pressure
         Air = self.thermo_air(T_film_wall_vap, self.P_atm)
         Cp_air = Air[0]
@@ -540,32 +599,69 @@ class Model(object):
         mu_air = Air[2]
         k_air = Air[3]
         beta_air = Air[4]
+        
+        #TEST FOR AIR THERMO PROPERTIES 
+        print('##############################')
+        print('Cp_air = {}'.format(Air[0]))
+        print('rho_air = {}'.format(Air[1]))
+        print('mu_air = {}'.format(Air[2]))
+        print('k_air = {}'.format(Air[3]))
+        print('beta_air = {}'.format(Air[4]))
 
-        if T_liq == 0:
-            pass
-        else:
-            T_film_liq_surf = 0.5 * (T_vap + T_liq)
-            N2O_liq = self.Thermo_N2O_Liq(T_film_liq_surf, P)
-            Cp_liq = N2O_liq[0]
-            #rho_liq = N2O_liq[1]
-            mu_liq = N2O_liq[2]
-            k_liq = N2O_liq[3]
-            beta_liq = N2O_liq[4]
-            enthalpy_liq = N2O_liq[5]
-            enthalpy_liq_sat = N2O_liq[6]
 
-            N2O_vap = self.Thermo_N2O_Vap(T_film_liq_surf, P)
-            Cp_vap = N2O_vap[0]
-            #rho_vap = N2O_liq[1]
-            mu_vap = N2O_vap[2]
-            k_vap = N2O_vap[3]
-            beta_vap = N2O_vap[4]
-            #enthalpy_vap = N2O_vap[5]
-            enthalpy_vap_sat = N2O_vap[6]
-            P_sat = N2O_vap[7] +100
-            MM_vap = N2O_vap[8]
-            Z_vap = N2O_vap[9]
-            R_vap = N2O_vap[10]
+
+
+
+        T_film_liq_surf = 0.5 * (T_vap + T_liq)
+        
+        if T_film_liq_surf <= 183:
+            T_film_liq_surf = self.T_out
+
+        N2O_liq = self.Thermo_N2O_Liq(T_film_liq_surf, P)
+        Cp_liq = N2O_liq[0]
+        #rho_liq = N2O_liq[1]
+        mu_liq = N2O_liq[2]
+        k_liq = N2O_liq[3]
+        beta_liq = N2O_liq[4]
+        enthalpy_liq = N2O_liq[5]
+        enthalpy_liq_sat = N2O_liq[6]
+        print('##############################')
+        print('Cp_liq = {}'.format(N2O_liq[0]))
+        print('rho_liq = {}'.format(N2O_liq[1]))
+        print('mu_liq = {}'.format(N2O_liq[2]))
+        print('k_liq = {}'.format(N2O_liq[3]))
+        print('beta_liq = {}'.format(N2O_liq[4]))
+        print('enthalpy_liq = {}'.format(N2O_liq[5]))
+        print('enthalpy_liq = {}'.format(N2O_liq[6]))
+        print('##############################')
+        N2O_vap = self.Thermo_N2O_Vap(T_film_liq_surf, P)
+        Cp_vap = N2O_vap[0]
+        #rho_vap = N2O_liq[1]
+        mu_vap = N2O_vap[2]
+        k_vap = N2O_vap[3]
+        beta_vap = N2O_vap[4]
+        #enthalpy_vap = N2O_vap[5]
+        enthalpy_vap_sat = N2O_vap[6]
+        P_sat = N2O_vap[7]
+        MM_vap = N2O_vap[8]
+        Z_vap = N2O_vap[9]
+        R_vap = N2O_vap[10]
+
+        print('Cp_vap = {}'.format(N2O_vap[0]))
+        print('rho_vap = {}'.format(N2O_vap[1]))
+        print('mu_vap = {}'.format(N2O_vap[2]))
+        print('k_vap = {}'.format(N2O_vap[3]))
+        print('beta_vap = {}'.format(N2O_vap[4]))
+        print('enthalpy_vap = {}'.format(N2O_vap[5]))
+        print('enthalpy_vap = {}'.format(N2O_vap[6]))
+        print('P_sat = {}'.format(N2O_vap[7]))
+        print('MM_vap = {}'.format(N2O_vap[8]))
+        print('Z_vap = {}'.format(N2O_vap[9]))
+        print('R_vap = {}'.format(N2O_vap[10]))
+
+
+
+
 
         #########################
         ## Unpacking compelete ##
@@ -579,67 +675,97 @@ class Model(object):
         if L_vap == 0:
             L_vap = 0.000000000001 
         
+        #######################################
+        ## Note: All expressions are rounded ##
+        ##   to 10 decimal places to avoid   ##
+        ## potential RuntimeWarnings due to  ##
+        ##  dividing by a very small number  ##
+        #######################################
+
         #####################
         #   dQ_liq_surf/dt  #
         #####################
         EQ13 = (0.15 * ((Cp_liq * rho_liq**2 * g * beta_liq * abs(T_film_liq_surf - T_liq ) * L_liq**3 ) \
                 / (mu_liq * k_liq ) )**(1/3) * (k_liq/L_liq)) * A_liq_in * (T_film_liq_surf - T_liq)
-        
+        EQ13 = round(EQ13, 10)
+        print('dQ_liq_surf/dt = {}'.format(EQ13))
+
         #####################
         #   dQ_surf_vap/dt  #
         #####################
         EQ14 = (0.15 * ((Cp_vap * rho_vap**2 * g * beta_vap * abs(T_film_liq_surf - T_vap) * L_vap**3 )   \
                 / (mu_vap * k_vap ) )**(1/3) * (k_liq/L_vap)) * A_vap_in * (T_film_liq_surf - T_liq)
-        
+        EQ14 = round(EQ14,10)
+        print('dQ_surf_vap/dt = {}'.format(EQ14))
+
         ######################
         # dQ_wall_vap_out/dt #
         ######################
         EQ2 = (0.021 * ((Cp_vap * rho_vap**2 * g * beta_vap * abs(T_wall_vap - T_vap) * L_vap**3  ) \
                 / (mu_vap * k_vap ) )**(2/5) * (k_vap/L_vap)) * A_vap_in * (T_wall_vap - T_vap)
+        EQ2 = round(EQ2, 10)
+        print('dQ_wall_vap_out/dt = {}'.format(EQ2))
 
         #####################
         #dQ_wall_liq_out/dt #
         #####################
         EQ7 = (0.021 * ((Cp_liq * rho_liq**2 * g * beta_liq * abs(T_wall_liq - T_liq) * L_liq**3  ) \
                 / (mu_liq * k_liq ) )**(2/5) * (k_liq/L_liq)) * A_liq_in * (T_wall_liq - T_liq)
+        EQ7 = round(EQ7, 10)
+        print('dQ_wall_liq_out/dt = {}'.format(EQ7))
 
         ####################
         ##   dm_evap/dt   ##
         ####################
         EQ12 = (EQ13 - EQ14) / (N2O_latent_heat + (enthalpy_liq_sat - enthalpy_liq) )
-        
+        EQ12 = round(EQ12, 10)
+        print('dm_evap/dt = {}'.format(EQ12))
 
         #NEED TO CHECK CAN PRODUCE ERROR...
         ####################
         #    dm_cond/dt    #
         ####################
         if P > P_sat:
+            if T_vap <= 183:#attempts to fix an initial condition of 0K inside the tank....
+                T_vap = self.T_out
             EQ15 = ( ( P - P_sat) * V_vap * MM_vap ) / (Z_vap * R_vap  * T_vap * delta_t )
+            EQ15 = round(EQ15, 10)
         elif P <= P_sat: 
             EQ15 = 0
+
+        print('dm_cond/dt = {}'.format(EQ15))
 
         #####################
         #       dm_vap      #
         #####################
         EQ10 = EQ12 - EQ15
+        EQ10 = round(EQ10, 10)
+        print('dm_vap = {}'.format(EQ10))
 
         #####################
         #      dQ_in_vap    #
         #####################
         EQ24 = EQ2 + EQ14
+        EQ24 = round(EQ24, 10)
+        print('dQ_in_vap = {}'.format(EQ24))
 
         ####################
         #     dQ_in_liq    #
         ####################
         EQ25 = EQ7 + EQ13
-
+        EQ25 = round(EQ25, 10)
+        print('dQ_in_liq = {}'.format(EQ25))
 
         #ERRORs.... Need a more accurate description of dV_vap_dt...
         #####################
         #     d_rho_vap/dt  #
         #####################
+        if V_vap == 0:
+            V_vap = 0.0000000000000001
         EQ18 = 1/V_vap * EQ10 - m_vap / (V_vap)**2 * self.dV_vap_dt
-        
+        EQ18 = round(EQ18, 10)
+        print('d_rho_vap/dt = {}'.format(EQ18))
+
         #############
         ####NEED TO CHECK FOR UNCERTAINTY IN MEASURING THE HEIGHT.....
         #avoids having a 0 vapor density if the tank is completely empty, forces the Length of the vapor region to equal 0... 
@@ -651,8 +777,8 @@ class Model(object):
             EQ29 = 0
         else:
             EQ29 = 1/(np.pi * self.ri**2) * ((1/rho_vap) * EQ10 - (m_vap/rho_vap) * EQ18)
-
-
+            EQ29 = round(EQ29, 10)
+        print('dL_vap/dt = {}'.format(EQ29))
 
         ##### The rate of change of the vapor height needs to be checked....
 
@@ -660,19 +786,25 @@ class Model(object):
         #   dV_wall_vap/dt  #
         #####################
         EQ31 = np.pi * (self.ro**2 - self.ri**2) * EQ29
+        EQ31 = round(EQ31, 10)
+
+        print('dV_wall_vap/dt = {}'.format(EQ31))
 
         #####################
         # dQ_wall_vap_in/dt #
         #####################
         EQ1 = (0.59 * (  (Cp_air * (rho_air )**2 * g * beta_air * abs(T_wall_vap - self.T_atm) * L_vap**3)  \
                 / (mu_air * k_air ) )**(0.25) * (k_air/L_vap)) * A_vap_out * (T_wall_vap - self.T_atm)
+        EQ1 = round(EQ1, 10)
+        print('dQ_wall_vap_in/dt = {}'.format(EQ1))
 
         #####################
         # dQ_wall_liq_in/dt #
         #####################
         EQ6 = (0.59 * (  (Cp_air * (rho_air )**2 * g * beta_air * abs(T_wall_liq - self.T_atm) * L_liq**3)  \
                 / (mu_air * k_air ) )**(0.25) * (k_air/L_liq)) * A_liq_out * (T_wall_liq - self.T_atm)        
-
+        EQ6 = round(EQ6, 10)
+        print('dQ_wall_liq_in/dt = {}'.format(EQ6))
 
         #############
         # Note:
@@ -685,37 +817,58 @@ class Model(object):
         #######################
         EQ3 = (self.k_wall * (T_wall_liq - T_wall_vap) * np.pi * (self.ro**2 - self.ri**2)) \
                 / (0.5 * L_liq + 0.5 * L_vap)
+        EQ3 = round(EQ3, 10)
+        print('dQ_wall_vap_cond/dt = {}'.format(EQ3))
 
         #######################
         # dQ_wall_liq_cond/dt #
         #######################
         EQ8 = (self.k_wall * (T_wall_vap - T_wall_liq) * np.pi * (self.ro**2 - self.ri**2)) \
                 / (0.5 * L_liq + 0.5 * L_vap)
+        EQ8 = round(EQ8, 10)
+        print('dQ_wall_liq_cond/dt = {}'.format(EQ8))
 
         #####################
         # dm_wall_vap_in/dt #
         #####################
         EQ4 = EQ31 * self.rho_wall
+        EQ4 = round(EQ4, 10)
+        print('dm_wall_vap_in/dt = {}'.format(EQ4))
         
         #####################
         # dm_wall_liq_in/dt #
         #####################
         EQ9 = -EQ31 * self.rho_wall
-        
+        EQ9 = round(EQ9, 10)
+        print('dm_wall_liq_in/dt = {}'.format(EQ9))
 
         #DOUBLE CHECK T_wall_liq as T_w_in from EQs
         #####################
         #   dT_wall_vap/dt  #
         #####################
-        EQ0 = (EQ1 - EQ2 + EQ3 + EQ4 * self.C_wall * (T_wall_liq - T_wall_vap)) \
-                / (m_wall_vap * self.C_wall)
-        
+        try:
+            EQ0 = (EQ1 - EQ2 + EQ3 + EQ4 * self.C_wall * (T_wall_liq - T_wall_vap)) \
+                    / (m_wall_vap * self.C_wall)
+        except:
+            print('Division too small! Will approximate to 0!')
+            EQ0 = 0
+        else:
+            EQ0 = round(EQ0, 10)
+        print('dT_wall_vap/dt = {}'.format(EQ0))
+
         #####################
         #   dT_wall_vap/dt  #
         #####################
-        EQ5 = (EQ6 - EQ7 + EQ8 + EQ9 * self.C_wall * (T_wall_vap - T_wall_liq)) \
+        try:
+            EQ5 = (EQ6 - EQ7 + EQ8 + EQ9 * self.C_wall * (T_wall_vap - T_wall_liq)) \
                 / (m_wall_liq * self.C_wall)
+        except:
+            print('Division too small! Will approximate to 0!')
+            EQ5 = 0
+        else:
+            EQ5 = round(EQ5, 10)
 
+        print('dT_wall_vap/dt = {}'.format(EQ5))
 
         ###Note:
         # Change all M_dot later on...
@@ -724,8 +877,8 @@ class Model(object):
         #     dm_liq/dt     #
         #####################
         EQ11 = -EQ12 + EQ15 - self.M_dot
-
-
+        EQ11 = round(EQ11, 10)
+        print('dm_liq/dt = {}'.format(EQ11))
 
         #####
         # Note:
@@ -739,6 +892,9 @@ class Model(object):
             EQ21 = rho_liq
         else:
             EQ21 = 1/V_liq * EQ11 - (m_liq / V_liq**2) * (-self.dV_vap_dt)
+            EQ21 = round(EQ21, 10)
+
+        print('drho_liq/dt = {}'.format(EQ21))
 
         #####
         # assumes that the pressure at the exit is the same as the liquid pressure
@@ -751,7 +907,10 @@ class Model(object):
         #     dU_vap/dt     #
         #####################
         EQ17 = EQ12 * H_vap_calc[0] - EQ15 * H_vap_calc[1] - P * self.dV_vap_dt + EQ24
+        EQ17 = round(EQ17,10)
         
+        print('dU_vap/dt = {}'.format(EQ17))
+
         #####
         # for EQ 20 check sign on "P *self.dV_vap_dt"... might be positive if using the vapor volume rate of change
         # 
@@ -761,6 +920,9 @@ class Model(object):
         #     dU_liq/dt     #
         #####################
         EQ20 = self.M_dot * H_vap_calc[2] - EQ12 * H_vap_calc[0] + EQ15 * H_vap_calc[1] - P * self.dV_vap_dt + EQ25
+        EQ20 = round(EQ20, 10)
+        print('dU_liq/dt = {}'.format(EQ20))
+
 
         ########    
         # NEED TO ADD A TOTAL INTERNAL ENERGY COUNTER
@@ -775,6 +937,8 @@ class Model(object):
             EQ16 = 0
         else:
             EQ16 = (1 / Cp_vap) * (1/m_vap * (EQ17 - (U_vap / m_vap) * EQ10 ) - EQ18 * self.PDE(T_vap, rho_vap, m_vap) )
+            EQ16 = round(EQ16, 10)
+        print('dT_vap/dt = {}'.format(EQ16))
 
         ####################
         #     dT_liq/dt    #
@@ -783,10 +947,13 @@ class Model(object):
             EQ19 = 0
         else:
             EQ19 = (1 / Cp_liq) * (1/m_liq * (EQ20 - (U_liq / m_liq) * EQ11 ) - EQ18 * self.PDE(T_liq, rho_liq, m_liq) )
+            EQ19 = round(EQ19,10)
     
+        print('dT_liq/dt = {}'.format(EQ19))
+
         return EQ13, EQ14, EQ2, EQ7, EQ12, EQ15, EQ10, EQ24, EQ25, EQ18,\
                  EQ29, EQ31, EQ1, EQ6, EQ3, EQ8, EQ4, EQ9, EQ0, EQ5, EQ11, EQ21, \
-                     EQ17, EQ20, EQ16, EQ19
+                     EQ17, EQ20, EQ16, EQ19, P
 
 
 
