@@ -1,14 +1,22 @@
 """
 OOrtiz
-V: 3.3
+V: 3.4
 
 ADDED:
-Fluid saturation checks
-Quality root finding method 
-
+    JSantner added:
+        Quality_JS to use CoolProp instead of polynomial fit
+        Initial conditions for filling defined by T & P 
+        Plots state at time = 0
+        Supply tank source pressure set at 10 atn 
+        Sign of mass flow rate from Mass_flow_JS affects final tank pressure
+            -Stops mass flow when rocket tank P is higher than source tank P
+                Further P increases due to heat transfer
+         
 TO DO:
 Need to fix the pressure gradient at the pipe exit
 Need to track total mass transfer through piping
+Change draining initial conditons to be defined by T & P
+Handle supercritical state from supply tank pressure (currently low to avoid supercritcal state)
 """
 
 import numpy as np
@@ -58,16 +66,16 @@ class Main(object):
         self.Pipe_Info()
         self.z = self.Tank_initial(self.Fill)
 
-        self.t_plt = []     # Time
-        self.plot_0 = []    # N2O Temp
-        self.plot_1 = []    # U_N2O
-        self.plot_2 = []    # Wall Temp
-        self.plot_3 = []    # N2O Mass
-        self.plot_4 = []    # Tank Pressure
-        self.plot_5 = []    # Quality
-        self.plot_6 = []    # P_out
-        #self.plot_7 = []    # P_out
-        
+         # JS 3/11/2021 Added initial state
+        self.t_plt = [0]     # Time
+        self.plot_0 = [self.z[0]]    # N2O Temp
+        self.plot_1 = [self.z[1]]    # U_N2O
+        self.plot_2 = [self.z[2]]    # Wall Temp
+        self.plot_3 = [self.z[3]]    # N2O Mass
+        self.plot_4 = [self.z[4]]    # Tank Pressure
+        self.plot_5 = [self.z[5]]    # Quality
+        self.plot_6 = [self.z[6]]    # P_out
+
         try:
             self.Model(k)
             self.Visualize()
@@ -101,10 +109,6 @@ class Main(object):
                 break
             elif EQ_Solver == 'next':
                 continue
-            # PipeSolver = self.Pipe_Solve(EQ_Solver[7], EQ_Solver[0], EQ_Solver[5], EQ_Solver[8] , EQ_Solver[9])  # Commented out by JS, unnecessary with my m_dot method
-
-    # EQ_Solver[8] is P_out, which is the pressure in the tubing into/out of the tank
-    # PipeSolver is this pressure minus the pressure drop in the tubing
 
     ###################### JS major Change Summary #####################
     # PipeSolver calculates a huge pressure drop, such that the pressure is
@@ -115,19 +119,16 @@ class Main(object):
     # The Bernoulli equation here.
 
 
-            self.z = [  
+            self.z = [
                     EQ_Solver[0],
                     EQ_Solver[1],
                     EQ_Solver[2],
                     EQ_Solver[3],
-                    EQ_Solver[4], 
+                    EQ_Solver[4],
                     EQ_Solver[5],
                     self.z[6]
-                    ]   
-                        
-            #EQ_Solver[6]  # Changed by JS
-            #self.z[8]  # Changed by JS. The pressure far from the rocket tank is constant - either 1 atm for draining or P of storage tank for filling.
-                    
+                    ]
+
             self.t_plt.append(self.t)
             self.plot_0.append(self.z[0]) # N2O Temp
             self.plot_1.append(self.z[1]) # U_N2O
@@ -136,10 +137,7 @@ class Main(object):
             self.plot_4.append(self.z[4]) # Tank Pressure
             self.plot_5.append(self.z[5]) # Quality
             self.plot_6.append(self.z[6]) # P_out...
-            
-            #self.plot_8.append(self.z[8]) # P_out
-            #print(self.z[3])
-            
+
             # Ends the iteration if the mass falls below 0kg or it goes above 0.5% of the initial tank mass
             if self.z[3] <= 0 or self.z[3] >= 1.005*self.N2O_total_mass:
                 print("Loop Break\nMass out of range")
@@ -156,7 +154,7 @@ class Main(object):
         Sets the initial quality and tank pressures -- depends on selected filling or emptying mode
         """
 
-        self.T_N2O = 30 + 273.15 #K | wall temperature at liquid region
+        self.T_N2O = 20 + 273.15 #K | wall temperature at liquid region  # JS 3/11/2021 I made it colder to avoid supercritical T
         self.T_atm = 279.52 #K
         self.T_wall = 0.5 * (self.T_atm + self.T_N2O)
 
@@ -165,13 +163,18 @@ class Main(object):
             X = 0
             P_Tank = float(PropsSI('P', 'Q', X, 'T', self.T_N2O, 'N2O'))
             P_out = self.P_atm #Pa
+            U_init = float(PropsSI('U', 'Q', X, 'T', self.T_N2O, 'N2O') * self.N2O_init_mass )  # JS 3/11/2021
         elif Fill == True: #Initial Mass and Quality if tank is in Filling Mode
-            self.N2O_init_mass = 0.001 #kg
-            X = 1
+            # self.N2O_init_mass = 0.001 #kg # JS 3/11/2021
+            # X = 1 # JS 3/11/2021
+            X = 2  # should be superheated, initially.
             P_Tank = self.P_atm #Pa | if Filling Tank Assumed to be at P_atm
-            P_out = float(PropsSI('P', 'Q', X, 'T', self.T_N2O, 'N2O'))
+            self.N2O_init_mass = PropsSI('D', 'T', self.T_N2O, 'P', P_Tank, 'N2O') * self.V_tank_inside # JS 3/11/2021
+            # P_out = float(PropsSI('P', 'Q', X, 'T', self.T_N2O, 'N2O'))# JS 3/11/2021
+            P_out = 10 * self.P_atm # This is the pressure of the supply tank, right? We can find this, I just made a guess  # JS 3/11/2021
+            U_init = float(PropsSI('U', 'T', self.T_N2O, 'P', P_Tank, 'N2O') * self.N2O_init_mass)  # JS 3/11/2021
 
-        U_init = float(PropsSI('U', 'Q', X, 'T', self.T_N2O, 'N2O') * self.N2O_init_mass )
+        # U_init = float(PropsSI('U', 'Q', X, 'T', self.T_N2O, 'N2O') * self.N2O_init_mass )  # JS 3/11/2021
 
         return self.T_N2O, U_init, self.T_wall, self.N2O_init_mass, P_Tank, X, P_out
 
@@ -209,7 +212,7 @@ class Main(object):
         self.rough = 0.000045 #m | Commercial Steel
         self.L_pipe = 3.048 #m | Total length of pipe 10ft
         k = [1, .5, 2.3, 2.3, 2.3, 70, 0.75, 2, 10, 6, 6, 6 ] #Loss coefficients due to bends, valves, etc. assume constant Velocity but inaccurate
-        
+
         self.K_pipe = sum([losses for losses in k])
 
     def Tank_Material(self):
@@ -285,7 +288,7 @@ class Main(object):
     def N2O_Unsat(self, T, P):
         """
         Method calculates and returns thermodynamic properties of N2O at the input temperature and pressure.
-        Only valid for unsaturated conditions between the triple point and critical points. 
+        Only valid for unsaturated conditions between the triple point and critical points.
         The maximum allowed temperature input is the critical temperature, if any temperature
         """
         phase_Check = CP.PhaseSI('P',P,'T',T,'N2O')
@@ -316,22 +319,17 @@ class Main(object):
 
         return Cp, rho, mu, k, beta
 
-        # if T >= 309.52:
-        #     print("Input Temperature is ABOVE Critical Temperature!")
-        #     print("{:.2f}K will be set to 309.50K!".format(T))
-        #     T = 309.50
-
     def Mass_flow_JS(self, Ps, rho, mu):
         """Calculate the mass flow rate
 
         Governing Equation:
-        abs(P1 - P2) = rho * g * head_loss
+        (P2 - P1) = rho * g * head_loss
 
         Parameters
         ----------
         Ps : tuple of length 2
             Two floats indicating the pressure in the tank and at the far end
-            of the tube. Order doesn't matter. Units are Pascals
+            of the tube. Units are Pascals
         rho : float
             Density of the liquid in the tube, kg/m^3
         mu : float
@@ -342,7 +340,10 @@ class Main(object):
         mdot : float
             Mass flow rate, kg/s
         """
-        h_loss = abs(Ps[0] - Ps[1]) / (rho * g)
+        if Ps[0] > Ps[1]:   # JS 3/11/2021
+            # There is a check valve, so flow cannot go backwards.
+            return 0   # JS 3/11/2021
+        h_loss = (Ps[1] - Ps[0]) / (rho * g)   # JS 3/11/2021
 
         def h_loss_func(V, rho, D, mu, L, K, rough, h_loss_expected):
             """Return the difference between head loss and expected head loss."""
@@ -362,12 +363,12 @@ class Main(object):
         args = (rho, self.D_pipe, mu, self.L_pipe, self.K_pipe, self.rough, h_loss)
         sol = root(h_loss_func, 1, args=args)
         velocity = sol.x[0]
-        if self.Fill:
-            sign = 1
-        else:
-            sign = -1
+        # if self.Fill:   # JS 3/11/2021
+        #     sign = 1   # JS 3/11/2021
+        # else:   # JS 3/11/2021
+        #     sign = -1   # JS 3/11/2021
 
-        return velocity * self.A_pipe * rho * sign
+        return velocity * self.A_pipe * rho# * sign   # JS 3/11/2021
 
     def Mass_flux(self, A, P1, h1, rho1, P2, h2, rho2):
         """
@@ -421,8 +422,8 @@ class Main(object):
         Method where the N2O state equations are solved.
         Assumes heat transfer on the tank wall is instant.
         """
-        T_N2O_1 = IC[0] 
-        U_N2O_1 = IC[1] 
+        T_N2O_1 = IC[0]
+        U_N2O_1 = IC[1]
         T_wall = IC[2]
         N2O_mass_1 = IC[3]
         P_N2O_1 = IC[4]
@@ -440,11 +441,12 @@ class Main(object):
                 rho1 = float(PropsSI('D', 'T', T_N2O_1, 'P', P_N2O_1, 'N2O'))
             # State 2 is defined at the P of the exit/entry, not the T...JS
             h2 = float(PropsSI('H', 'P', P_out, 'Q', 0, 'N2O'))
-            rho2 = float(PropsSI('D', 'P', P_out, 'Q', 0, 'N2O'))
+            # rho2 = float(PropsSI('D', 'P', P_out, 'Q', 0, 'N2O'))    # JS 3/11/2011
+            T2 = float(PropsSI('T', 'P', P_out, 'Q', 0, 'N2O'))    # JS 3/11/2011
+            _, rho2, mu_n2o_2, _, _ = self.N2O_prop(T2, 0)    # JS 3/11/2011
         except Exception as e:
             print(e)  # Added by JS
             raise
-
         # Calls Mass Flux method which returns mass flow rate.
         # Negative mass flow indicates flow out of the tank.
         # m_dot = self.Mass_flux(A_out, P_N2O, h1, rho1, P_out, h2, rho2)
@@ -455,15 +457,15 @@ class Main(object):
 
         # Calculates and unpacks. Simplified by JS
         Cp_air, rho_air, mu_air, k_air, beta_air = self.Air_prop(T_film_wall_outside)
-        
+
         if 0 <= X <= 1:
             Cp_n2o, N2O_density, mu_n2o, k_n2o, beta_n2o = self.N2O_prop(T_film_wall_inside, X)
         else:
-            Cp_n2o, N2O_density, mu_n2o, k_n2o, beta_n2o = self.N2O_Unsat(T_film_wall_inside, P_N2O_1) 
+            Cp_n2o, N2O_density, mu_n2o, k_n2o, beta_n2o = self.N2O_Unsat(T_film_wall_inside, P_N2O_1)
 
         # JS modification - use new method for filling, old method for draining
         if self.Fill:
-            m_dot = self.Mass_flow_JS([P_N2O_1, P_out], rho2, mu_n2o)
+            m_dot = self.Mass_flow_JS([P_N2O_1, P_out], rho2, mu_n2o_2)    # JS 3/11/2011
         else:
             m_dot = self.Mass_flux(self.A_tank_exit, P_N2O_1, h1, rho1, P_out, h2, rho2)
 
@@ -490,7 +492,7 @@ class Main(object):
         ######
 
         dQ_in_dt = dQ_wall_inside_dt #+ dQ_wall_cond_dt
-        dQ = dQ_in_dt * t_step 
+        dQ = dQ_in_dt * t_step
 
         ######
         ######
@@ -523,7 +525,7 @@ class Main(object):
             return self.end_loop
 
         T_N2O_2, X_2, P_N2O_2 = temp_array
-        
+
         V_out = abs(m_dot)/(rho2 * self.A_tank_exit)  # JS version
 
         # return T, dU_tot, dT_wall, dm_dot, P, X, A_out, dm_dot, P_out, V_out
@@ -548,7 +550,7 @@ class Main(object):
                 and
                 2) X = (U/m- u_l)/(u_v - u_l)
             """
-            T_r = T/309.57 #K | Reduced Temperature 
+            T_r = T[0]/309.57 #K | Reduced Temperature
             rho_c = 452 #kg/m^3 | Critical Density
             P_c = 7251000 #Pa | Critical Pressure
 
@@ -573,11 +575,36 @@ class Main(object):
             u_v = h_v - P* rho_v**(-1)
 
             x = (U/m - u_l)/(u_v - u_l)
-
             return U/m * (rho_l - rho_v) + u_l *(rho_l + rho_v) - (V/m * rho_l * rho_v - rho_v) * (u_v - u_l)
 
+        def Quality_JS(T, V, U, m):    # JS 3/11/2021
+            """
+            Uses rootfinding to find a temperature such that it satisfies the following:
+                1) V/m = (1-x)/rho_l + x/rho_v
+                and
+                2) X = (U/m- u_l)/(u_v - u_l)
+            Created by JS on 3/11/2021
+            Enthalpy is typically calculated relative to some reference point.
+            I'm guessing you were getting problems because you were mixing
+            CoolProps's enthalpy with some other polynomial fit.
+            """
+            if T <= 182.33:
+                return 0
+            u_l = PropsSI('U', 'T', T, 'Q', 0, 'N2O')
+            u_v = PropsSI('U', 'T', T, 'Q', 1, 'N2O')
+            x = (U/m - u_l)/(u_v - u_l)
+            x2 = quality_from_T_rho(T[0], m/V)
+            return x - x2
+
+
+        def quality_from_T_rho(T, rho): # JS 3/11/2021.
+            rho_l = PropsSI('D', 'T', T, 'Q', 0, 'N2O')
+            rho_v = PropsSI('D', 'T', T, 'Q', 1, 'N2O')
+            x = (1/rho - 1/rho_l)/(1/rho_v - 1/rho_l)
+            return x
+
         args = (Volume, U, mass)
-        eq_sol = root(Quality_V2, 250 , args=args)
+        eq_sol = root(Quality_JS, 250 , args=args)  # JS Note: This assumes the tank is a saturated mixture.  # JS 3/11/2021
         print(eq_sol.message)
         print(eq_sol.x)
         Temp_sol = eq_sol.x[0]
@@ -585,19 +612,27 @@ class Main(object):
         if Temp_sol <= 182.33:
             Temp_sol = 182.34
 
-        X_sol = PropsSI("Q", "T", Temp_sol, "D", mass/Volume, "N2O")
-        
+        # X_sol = PropsSI("Q", "T", Temp_sol, "D", mass/Volume, "N2O")  # JS 3/11/2021
+        X_sol = quality_from_T_rho(Temp_sol, mass/Volume)  # JS 3/11/2021
 
+        ###### Block below # JS 3/11/2021
+        if 0 <= X_sol <= 1:
+            P_N2O = PropsSI('P', 'T', Temp_sol, 'Q', X_sol, 'N2O')
+        else:
+            P_N2O = PropsSI('P', 'D', mass/Volume, 'U', U/mass, 'N2O')
+            Temp_sol = PropsSI('T', 'D', mass/Volume, 'U', U/mass, 'N2O')
+        ######## End new block. #########
 
-        T_r = Temp_sol/309.57
-        f1, f2, f3, f4 = -6.71893, 1.35966, -1.3779, -4.051
-        P_N2O = 7251000 * e(1/T_r * ( \
-                            f1*(1 - T_r) + f2*(1 - T_r)**(3/2) + f3*(1 - T_r)**(5/2) + f4*(1 - T_r)**5 ) )
+        # A lot of stuff below is removed by JS 3/11/2021
+        # T_r = Temp_sol/309.57
+        # f1, f2, f3, f4 = -6.71893, 1.35966, -1.3779, -4.051
+        # P_N2O = 7251000 * e(1/T_r * ( \
+        #                     f1*(1 - T_r) + f2*(1 - T_r)**(3/2) + f3*(1 - T_r)**(5/2) + f4*(1 - T_r)**5 ) )
 
-        if P_N2O < 101340:
-            P_N2O = 101340
-        elif P_N2O > 7.245e+06:
-            P_N2O = 7.245e+06
+        # if P_N2O < 101340:
+        #     P_N2O = 101340
+        # elif P_N2O > 7.245e+06:
+        #     P_N2O = 7.245e+06
 
         # print("Temp Solution = {:.3f}".format(Temp_sol)) JS
         print("Quality = {:.4f}".format(X_sol))
@@ -679,9 +714,9 @@ class Main(object):
         plt.show()
 
         fig, ax = plt.subplots(figsize=(8,8))
-        plt.ylabel('Pressure (Pa)')
+        plt.ylabel('Pressure (kPa)')  # JS 3/11/2021
         plt.xlabel('Time (s)')
-        line1, = ax.plot(self.t_plt, self.plot_4, label='Pressure')
+        line1, = ax.plot(self.t_plt, [x/1000 for x in self.plot_4], label='Pressure') # JS 3/11/2021
         plt.grid(True)
         plt.title('N2O Tank Pressure')
         plt.legend()
